@@ -33,7 +33,20 @@ logging.basicConfig(format='[%(asctime)s] %(levelname)s:%(message)s', level=logg
 LOG_LEVEL = 0
 logger.info('Starting rtlamr2mqtt %s', i.version())
 
+def get_mqtt_receiver_state(mqtt_client, topic):
+    """ Get the state of the MQTT receiver from the last message received """
+    if mqtt_client.last_message is not None:
+        msg = mqtt_client.last_message
+        mqtt_client.last_message = None
 
+        payload = msg.payload.decode("utf-8", errors="replace")
+        if LOG_LEVEL >= 3:
+            logger.debug('Received MQTT message: %s on topic %s', payload, msg.topic)
+
+        if msg.topic == topic:
+            if isinstance(payload, str):
+                return payload.strip().lower()
+    return None
 
 def shutdown(rtlamr=None, rtltcp=None, mqtt_client=None, base_topic='rtlamr', offline=False):
     """ Shutdown function to terminate processes and clean up """
@@ -129,7 +142,7 @@ def start_rtltcp(config):
 
     try:
         # rtltcp = subprocess.Popen(["strace", "--output=out.trace", "rtl_tcp"] + rtltcp_args,
-        rtltcp = subprocess.Popen(["/usr/bin/unbuffer"] + rtltcp_full_command,
+        rtltcp = subprocess.Popen(["stdbuf", "-oL"] + rtltcp_full_command,
             start_new_session=True,
             text=True,
             close_fds=False,
@@ -180,7 +193,7 @@ def start_rtlamr(config):
     if LOG_LEVEL >= 3:
         logger.info('Starting RTLAMR using: %s', " ".join(rtlamr_full_command))
     try:
-        rtlamr = subprocess.Popen(["/usr/bin/unbuffer"] + rtlamr_full_command,
+        rtlamr = subprocess.Popen(["stdbuf", "-oL"] + rtlamr_full_command,
             close_fds=True,
             text=True,
             start_new_session=True,
@@ -303,7 +316,7 @@ def main():
         )
 
     # Give some time for the MQTT client to connect and publish
-    sleep(1)
+    sleep(2)
     # Publish the initial status
     mqtt_client.publish(
         topic=f'{config["mqtt"]["base_topic"]}/status',
@@ -322,22 +335,6 @@ def main():
     read_counter = []
     while keep_reading:
         try:
-            if mqtt_client.last_message is not None:
-                if LOG_LEVEL >= 3:
-                    logger.debug('Received MQTT message: %s on topic %s',
-                        mqtt_client.last_message.payload.decode(),
-                        mqtt_client.last_message.topic
-                    )
-                    for meter in config['meters']:
-                        discovery_payload = ha_msgs.meter_discover_payload(config["mqtt"]["base_topic"], config['meters'][meter])
-                        mqtt_client.publish(
-                            topic=f'{config["mqtt"]["ha_autodiscovery_topic"]}/device/{meter}/config',
-                            payload=dumps(discovery_payload),
-                            qos=1,
-                            retain=False
-                        )
-                mqtt_client.last_message = None
-
             # Start RTL_TCP if not remote
             if not is_rtltcp_remote:
                 if rtltcp is None:
@@ -409,6 +406,21 @@ def main():
                 keep_reading = False
                 break
 
+            if get_mqtt_receiver_state(mqtt_client, config['mqtt']['ha_status_topic']) == 'online':
+                # New client is online. Re-publish discovery topics before sending data.
+                sleep(2)
+                for meter in config['meters']:
+                    discovery_payload = ha_msgs.meter_discover_payload(config["mqtt"]["base_topic"], config['meters'][meter])
+                    mqtt_client.publish(
+                        topic=f'{config["mqtt"]["ha_autodiscovery_topic"]}/device/{meter}/config',
+                        payload=dumps(discovery_payload),
+                        qos=1,
+                        retain=False
+                        )
+                # Home Assistant appears to lose value messages if this is really the
+                # first time it has seen the discovery message, so wait a bit.
+                sleep(2)
+
             # Search for ID in the output
             reading = ro.get_message_for_ids(
                 rtlamr_output = rtlamr_output,
@@ -459,6 +471,8 @@ def main():
                     logger.info('Sleeping for %d seconds...', config["general"]["sleep_for"])
                 # Shutdown everything, but mqtt_client
                 shutdown(rtlamr=rtlamr, rtltcp=rtltcp, mqtt_client=None)
+                rtlamr = None
+                rtltcp = None
                 read_counter = []
                 try:
                     sleep(int(config['general']['sleep_for']))
