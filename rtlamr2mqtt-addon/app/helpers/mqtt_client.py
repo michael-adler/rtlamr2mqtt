@@ -57,7 +57,10 @@ class MQTTClient:
         """
         if self.log_level >= 3:
             self.logger.info(f"Publishing to {topic}: {payload}")
-        self.client.publish(topic, payload=payload, qos=qos, retain=retain)
+        result = self.client.publish(topic, payload=payload, qos=qos, retain=retain)
+        result.wait_for_publish(timeout=30)
+        if not result.is_published():
+            raise TimeoutError(f"Publishing to {topic} timed out")
 
     def subscribe(self, topic, qos=0):
         """
@@ -71,6 +74,8 @@ class MQTTClient:
         """
         Default callback for incoming messages.
         """
+        if self.log_level >= 3:
+            self.logger.info(f"Received message on {message.topic}: {message.payload.decode()}")
         self.last_message = message
 
     def loop_start(self):
