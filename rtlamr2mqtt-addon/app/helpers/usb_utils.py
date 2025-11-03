@@ -11,6 +11,7 @@ import os
 import re
 import usb.core
 import socket
+import subprocess
 
 def load_id_file(sdl_ids_file):
     """
@@ -45,15 +46,21 @@ def reset_usb_device(usbdev):
     Reset USB port
     """
     if usbdev is not None and ':' in usbdev:
-        busnum, devnum = [int(x) for x in usbdev.split(':')]
-        filename = f"/dev/bus/usb/{busnum:03d}/{devnum:03d}"
-        if os.path.exists(filename) and S_ISCHR(os.stat(filename).st_mode):
-            #define USBDEVFS_RESET_IO('U', 20)
-            USBDEVFS_RESET = ord('U') << (4*2) | 20
-            fd = open(filename, "wb")
-            result = int(ioctl(fd, USBDEVFS_RESET, 0)) == 0
-            fd.close()
-            return result
+        try:
+            subprocess.run(['sudo', '/usr/local/sbin/rtl_reset'], check=True)
+            return True
+        except subprocess.CalledProcessError as e:
+            print(f"Command failed with error: {e}")
+
+        #busnum, devnum = [int(x) for x in usbdev.split(':')]
+        #filename = f"/dev/bus/usb/{busnum:03d}/{devnum:03d}"
+        #if os.path.exists(filename) and S_ISCHR(os.stat(filename).st_mode):
+        #    #define USBDEVFS_RESET_IO('U', 20)
+        #    USBDEVFS_RESET = ord('U') << (4*2) | 20
+        #    fd = open(filename, "wb")
+        #    result = int(ioctl(fd, USBDEVFS_RESET, 0)) == 0
+        #    fd.close()
+        #    return result
     return False
 
 def tickle_rtl_tcp(remote_server):
