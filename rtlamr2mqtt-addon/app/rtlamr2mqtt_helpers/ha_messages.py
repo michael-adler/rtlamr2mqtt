@@ -2,7 +2,7 @@
 Helper functions for writing MQTT payloads
 """
 
-import helpers.info as i
+import rtlamr2mqtt_helpers.info as i
 
 def meter_discover_payload(base_topic, meter_config):
     """

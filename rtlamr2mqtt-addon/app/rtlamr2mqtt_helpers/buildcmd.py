@@ -3,7 +3,7 @@ Helper functions for building command for rtl_tcp and rtlamr
 """
 
 from os import environ
-import helpers.usb_utils as usbutils
+import rtlamr2mqtt_helpers.usb_utils as usbutils
 
 def get_comma_separated_str(key, list_of_dict):
     """

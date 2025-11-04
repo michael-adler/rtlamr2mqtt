@@ -18,13 +18,13 @@ from datetime import datetime
 from json import dumps
 from time import sleep
 from shutil import which
-import helpers.config as cnf
-import helpers.buildcmd as cmd
-import helpers.mqtt_client as m
-import helpers.ha_messages as ha_msgs
-import helpers.read_output as ro
-import helpers.usb_utils as usbutil
-import helpers.info as i
+import rtlamr2mqtt_helpers.config as cnf
+import rtlamr2mqtt_helpers.buildcmd as cmd
+import rtlamr2mqtt_helpers.mqtt_client as m
+import rtlamr2mqtt_helpers.ha_messages as ha_msgs
+import rtlamr2mqtt_helpers.read_output as ro
+import rtlamr2mqtt_helpers.usb_utils as usbutil
+import rtlamr2mqtt_helpers.info as i
 
 
 # Set up logging

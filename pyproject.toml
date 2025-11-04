@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rtlamr2mqtt"
+version = "0.1.0"
+description = "RTL AMR to MQTT - read meters by radio for Home Assistant"
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "paho-mqtt",
+    "pyusb",
+    "requests",
+    "setuptools"
+]
+
+[project.urls]
+Homepage = "https://github.com/michael-adler/rtlamr2mqtt"
+
+[project.scripts]
+rtlamr2mqtt = "rtlamr2mqtt_addon.rtlamr2mqtt:main"
+
+[tool.setuptools]
+package-dir = {"rtlamr2mqtt_addon" = "rtlamr2mqtt-addon/app", "rtlamr2mqtt_helpers" = "rtlamr2mqtt-addon/app/rtlamr2mqtt_helpers"}
+packages = ["rtlamr2mqtt_addon", "rtlamr2mqtt_helpers"]
+
+[tool.setuptools.package-data]
+"rtlamr2mqtt_helpers" = ["sdl_ids.txt"]
