@@ -4,6 +4,8 @@ general:
   sleep_for: 0
   # Verbose output. It can be: debug, info, warning, error, none
   verbosity: debug
+  # Time limit for looping and remaining active (seconds). 0 for infinite.
+  time_limit: 0
   # if you have multiple RTL devices, set the device id to use with this instance.
   # Get the ID running the lsusb command. If not specified, the first device will be used.
   # Example:

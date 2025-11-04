@@ -64,7 +64,7 @@ def shutdown(rtlamr=None, rtltcp=None, mqtt_client=None, base_topic='rtlamr', of
             rtlamr.kill()
             rtlamr.communicate()
         if LOG_LEVEL >= 3:
-            logger.info('RTLAMR Terminitaed.')
+            logger.info('RTLAMR Terminated.')
     # Terminate RTL_TCP
     if rtltcp not in [None, 'remote']:
         if LOG_LEVEL >= 3:
@@ -77,7 +77,7 @@ def shutdown(rtlamr=None, rtltcp=None, mqtt_client=None, base_topic='rtlamr', of
             rtltcp.kill()
             rtltcp.communicate()
         if LOG_LEVEL >= 3:
-            logger.info('RTL_TCP Terminitaed.')
+            logger.info('RTL_TCP Terminated.')
     if mqtt_client is not None and offline:
         mqtt_client.publish(
             topic=f'{base_topic}/status',
@@ -96,6 +96,12 @@ def signal_handler(signum, frame):
     """ Signal handler for SIGINT and SIGTERM """
     raise RuntimeError(f'Signal {signum} received.')
 
+
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException("Function call timed out!")
 
 
 def get_iso8601_timestamp():
@@ -236,8 +242,9 @@ def main():
     Main function
     """
     # Signal handlers/call back
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
+    #signal.signal(signal.SIGTERM, signal_handler)
+    #signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGALRM, timeout_handler)
 
     # Load the configuration file
     if len(sys.argv) == 2:
@@ -333,8 +340,15 @@ def main():
     rtlamr = None
     keep_reading = True
     read_counter = []
-    while keep_reading:
-        try:
+
+    time_limit = config['general']['time_limit']
+    if time_limit > 0:
+        if LOG_LEVEL >= 2:
+            logger.info('Time limit set to %d seconds.', time_limit)
+        signal.alarm(time_limit)
+
+    try:
+        while keep_reading:
             # Start RTL_TCP if not remote
             if not is_rtltcp_remote:
                 if rtltcp is None:
@@ -394,17 +408,7 @@ def main():
                         )
                 sys.exit(1)
 
-            try:
-                rtlamr_output = rtlamr.stdout.readline().strip()
-                # rtlamr_output = rtlamr.stdout.read1().strip()
-            except KeyboardInterrupt:
-                logger.critical('Interrupted by user.')
-                keep_reading = False
-                break
-            except Exception as e:
-                logger.critical(e)
-                keep_reading = False
-                break
+            rtlamr_output = rtlamr.stdout.readline().strip()
 
             if get_mqtt_receiver_state(mqtt_client, config['mqtt']['ha_status_topic']) == 'online':
                 # New client is online. Re-publish discovery topics before sending data.
@@ -474,38 +478,20 @@ def main():
                 rtlamr = None
                 rtltcp = None
                 read_counter = []
-                try:
-                    sleep(int(config['general']['sleep_for']))
-                except KeyboardInterrupt:
-                    logger.critical('Interrupted by user.')
-                    keep_reading = False
-                    shutdown(
-                        rtlamr=rtlamr,
-                        rtltcp=rtltcp,
-                        mqtt_client=mqtt_client,
-                        base_topic=config['mqtt']['base_topic'],
-                        offline=True
-                    )
-                    break
-                except Exception:
-                    logger.critical('Term siganal received. Exiting...')
-                    keep_reading = False
-                    shutdown(
-                        rtlamr=rtlamr,
-                        rtltcp=rtltcp,
-                        mqtt_client=mqtt_client,
-                        base_topic=config['mqtt']['base_topic'],
-                        offline=True
-                    )
-                    break
+                sleep(int(config['general']['sleep_for']))
                 if LOG_LEVEL >= 3:
                     logger.info('Time to wake up!')
 
             sleep(1)  # Sleep for a short time to avoid busy waiting
-        except RuntimeError as e:
-            # Handle the signal received
-            logger.critical('Runtime error: %s', e)
-            keep_reading = False
+
+    except KeyboardInterrupt:
+        logger.critical('Interrupted by user.')
+    except TimeoutException as e:
+        logger.critical('Timeout.')
+    except Exception as e:
+        logger.critical(f"An unexpected exception occurred: {e}")
+    finally:
+        signal.alarm(0)  # Disable any pending alarms
 
     # Shutdown
     shutdown(

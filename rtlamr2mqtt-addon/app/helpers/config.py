@@ -84,6 +84,7 @@ def load_config(config_path=None):
     # General section
     general['sleep_for'] = int(general.get('sleep_for', 0))
     general['verbosity'] = str(general.get('verbosity', 'info'))
+    general['time_limit'] = int(general.get('time_limit', 0))
     general['device_id'] = str(general.get('device_id', '0'))
     general['rtltcp_host'] = str(general.get('rtltcp_host', '127.0.0.1:1234'))
     # MQTT section
